@@ -3,7 +3,6 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 COPY . .
-EXPOSE 3001
-
-# Jika API Anda biasa dijalankan dengan "npm run dev", ubah "start" menjadi "run", "dev"
+# Ganti EXPOSE 3001 menjadi EXPOSE 8080
+EXPOSE 8080
 CMD ["npm", "start"]
