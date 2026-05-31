@@ -1,8 +1,9 @@
-FROM node:22-alpine AS build
+FROM node:22-alpine
 WORKDIR /app
 COPY package*.json ./
 RUN npm install
 COPY . .
-# Ganti EXPOSE 3001 menjadi EXPOSE 8080
+# INI DIA KUNCI YANG HILANG:
+RUN npm run build
 EXPOSE 8080
 CMD ["npm", "start"]
