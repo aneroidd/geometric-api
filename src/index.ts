@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
-import locationRoutes from './routes/locations.routes'; 
-import { regionsRouter } from './routes/regions.routes'; // 1. Tambahkan import ini
+import locationRoutes from './routes/locations.routes.js'; 
+import { regionsRouter } from './routes/regions.routes.js';// 1. Tambahkan import ini
 
 const app = express();
 const PORT = process.env.PORT || 3001;

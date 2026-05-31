@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { analyzeLocationPotential } from '../services/analysis.service';
+import { analyzeLocationPotential } from '../services/analysis.service.js';
 
 const router = Router();
 
