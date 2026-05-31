@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 // Sesuaikan path import db di bawah ini dengan letak file database aslimu
-import { db } from '../config/database';
+import { db } from '../config/database.js';
 
 export const getRegionsGeoJSON = async () => {
   const result = await db.execute(sql`
