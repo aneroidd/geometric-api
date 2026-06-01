@@ -38,8 +38,11 @@ async function injectGeoJSONPOIs(fileName: string, category: string) {
       if (count % 100 === 0) {
         console.log(`   Progress: ${count} data ${category} berhasil masuk...`);
       }
-    } catch (err) {
-      // Abaikan jika ada 1-2 data OSM yang korup
+    } catch (err: any) {
+      // 🔥 INI BAGIAN YANG KITA UBAH AGAR MESINNYA JUJUR 🔥
+      console.error(`\n❌ GAGAL MEMASUKKAN DATA "${name}". ALASAN:`, err.message || err);
+      // Kita lempar errornya ke luar agar skrip langsung berhenti
+      throw err;
     }
   }
 
@@ -58,7 +61,7 @@ async function main() {
     console.log('\n🎉 SEMUA DATA TITIK OSM BERHASIL MASUK DATABASE!');
     process.exit(0);
   } catch (error) {
-    console.error('❌ Terjadi kesalahan:', error);
+    console.error('\n❌ PROSES TERHENTI KARENA ERROR DATABASE DI ATAS!');
     process.exit(1);
   }
 }

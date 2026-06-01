@@ -9,7 +9,7 @@ const { Pool } = pkg;
 
 // Koneksi langsung terhubung ke brewmap_db
 const pool = new Pool({
-  connectionString: "postgresql://postgres:Pulokulon1@localhost:5432/brewmap_db"
+  connectionString: "postgresql://neondb_owner:npg_Jf4BlOP1mGSv@ep-broad-leaf-aode5p14.c-2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require"
 });
 const db = drizzle(pool);
 

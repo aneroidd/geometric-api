@@ -2,55 +2,85 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { sql } from 'drizzle-orm';
-import { db } from './config/database';
+import { db } from './config/database'; 
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 async function seedPopulation() {
+  // Pastikan nama filenya benar (penduduk.csv)
   const csvPath = path.join(__dirname, 'data', 'penduduk.csv');
-
+  
   if (!fs.existsSync(csvPath)) {
-    console.error(`❌ File tidak ditemukan di: ${csvPath}`);
+    console.error(`❌ File tidak ditemukan di rute: ${csvPath}`);
     return;
   }
 
   const rawData = fs.readFileSync(csvPath, 'utf8');
-  const rows = rawData.split('\n');
+  // Membaca CSV dan memecahnya per baris (menghilangkan baris kosong)
+  const lines = rawData.split(/\r?\n/).filter(line => line.trim() !== '');
 
-  console.log('🚀 Memulai sinkronisasi data penduduk ke database...');
-  let suksesCount = 0;
+  if (lines.length < 2) {
+    console.error('❌ File CSV kosong atau hanya berisi header.');
+    return;
+  }
 
-  // Membaca baris demi baris (melewati baris pertama jika itu header)
-  for (let i = 1; i < rows.length; i++) {
-    const row = rows[i].trim();
-    if (!row) continue;
+  // Baris pertama pasti Header (Nama Kolom)
+  const headers = lines[0].split(',').map(h => h.trim());
+  console.log(`📊 Kolom terdeteksi: [${headers.join(', ')}]`);
+  console.log(`🚀 Memulai injeksi ${lines.length - 1} data penduduk...`);
 
-    // Memisahkan kolom menggunakan koma atau titik koma (tergantung regional setting Excel)
-    const columns = row.includes(';') ? row.split(';') : row.split(',');
-    
-    // Sesuaikan indeks kolom ini dengan struktur file CSV Anda:
-    // Asumsi format: Kecamatan, Kelurahan, Kabupaten, Jumlah Penduduk
-    const kecamatan = columns[0]?.trim();
-    const kelurahan = columns[1]?.trim().replace('Kelurahan ', '').replace('Desa ', '');
-    const jumlahPenduduk = parseInt(columns[3]?.trim().replace(/\D/g, ''), 10);
+  // 1. BUAT WADAH BERSIH (Tabel penduduk)
+  console.log(`🧹 Membersihkan dan menyiapkan tabel penduduk...`);
+  await db.execute(sql.raw(`
+    DROP TABLE IF EXISTS penduduk CASCADE;
+    CREATE TABLE penduduk (
+        id SERIAL PRIMARY KEY,
+        region_name TEXT,
+        -- Kita gunakan JSONB agar semua angka/data fleksibel masuk ke sini
+        data JSONB 
+    );
+  `));
+  console.log(`✅ Tabel penduduk baru siap!`);
 
-    if (kelurahan && !isNaN(jumlahPenduduk)) {
-      try {
-        // Update database berdasarkan kecocokan nama kelurahan
-        await db.execute(sql`
-          UPDATE regions 
-          SET population = ${jumlahPenduduk}
-          WHERE LOWER(name) LIKE LOWER(${'%' + kelurahan + '%'})
-        `);
-        suksesCount++;
-      } catch (err) {
-        console.error(`❌ Gagal update wilayah: ${kelurahan}`, err);
-      }
+  // 2. SISTEM KLOTER BATCHING
+  const BATCH_SIZE = 100;
+  let successCount = 0;
+
+  // Kita mulai dari index 1 karena index 0 adalah header
+  for (let i = 1; i < lines.length; i += BATCH_SIZE) {
+    const batch = lines.slice(i, i + BATCH_SIZE);
+    const values: string[] = [];
+
+    batch.forEach((line) => {
+      // Pecah baris berdasarkan koma
+      const cols = line.split(',').map(c => c.trim().replace(/'/g, "''")); // Sanitasi
+      
+      // Asumsi: Kolom pertama di CSV Anda adalah nama Kelurahan/Desa
+      const regionName = cols[0] || 'Tanpa Nama';
+
+      // Bungkus semua kolom menjadi satu format JSON
+      const jsonData: Record<string, string> = {};
+      headers.forEach((header, index) => {
+        jsonData[header] = cols[index] || '';
+      });
+
+      // Susun query per baris
+      values.push(`('${regionName}', '${JSON.stringify(jsonData)}')`);
+    });
+
+    const query = `INSERT INTO penduduk (region_name, data) VALUES ${values.join(', ')}`;
+
+    try {
+      await db.execute(sql.raw(query));
+      successCount += batch.length;
+      console.log(`🚀 Berhasil mengunggah: ${successCount} / ${lines.length - 1} wilayah...`);
+    } catch (err) {
+      console.error(`❌ Gagal di kloter ke-${i}:`, err);
     }
   }
 
-  console.log(`\n✅ BERHASIL! Sukses memperbarui ${suksesCount} data demografi kelurahan!`);
+  console.log('✅ BINGO! Semua data Penduduk berhasil dimasukkan ke database!');
   process.exit(0);
 }
 
