@@ -1,8 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-// Mengambil kunci dari file .env
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
-
 export async function generateLocationAnalysis(
   locationName: string, 
   score: number, 
@@ -10,15 +7,24 @@ export async function generateLocationAnalysis(
   marketPotential: number
 ) {
   try {
-    // Kita gunakan model Gemini Flash yang sangat cepat
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    // Menarik kunci langsung dari mesin Cloud Run
+    const apiKey = process.env.GEMINI_API_KEY || '';
     
-    // Ini adalah 'Prompt Engineering' yang tersembunyi dari klien
+    if (!apiKey) {
+      console.error("API Key kosong!");
+      return "Error: Kunci API Gemini belum terdeteksi di server.";
+    }
+
+    const genAI = new GoogleGenerativeAI(apiKey);
+    
+    // 🔥 SOLUSI UTAMA: Kita gunakan Gemini 1.5 Pro (Model paling tangguh)
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+    
     const prompt = `
       Bertindaklah sebagai konsultan tata kota dan analis bisnis profesional. 
       Saya sedang menganalisis sebuah area untuk ekspansi bisnis.
       Berikut adalah data spasial area tersebut:
-      - Nama Kelurahan/Area: ${locationName}
+      - Nama Area: ${locationName}
       - Skor Kesesuaian Lokasi: ${score} / 100
       - Jumlah Kompetitor Terdekat: ${competitorCount} titik
       - Tingkat Potensi Pasar/Keramaian: ${marketPotential}
@@ -32,6 +38,6 @@ export async function generateLocationAnalysis(
     
   } catch (error) {
     console.error("Gagal memanggil Gemini AI:", error);
-    return "Analisis AI saat ini tidak tersedia karena gangguan jaringan.";
+    return "Maaf, Asisten AI sedang mengalami kendala server. Silakan coba beberapa saat lagi.";
   }
 }
