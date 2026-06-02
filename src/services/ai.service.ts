@@ -11,7 +11,7 @@ export async function generateLocationAnalysis(
 ) {
   try {
     // Kita gunakan model Gemini Flash yang sangat cepat
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
     
     // Ini adalah 'Prompt Engineering' yang tersembunyi dari klien
     const prompt = `
