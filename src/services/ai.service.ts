@@ -18,7 +18,7 @@ export async function generateLocationAnalysis(
     const genAI = new GoogleGenerativeAI(apiKey);
     
     // 🔥 SOLUSI UTAMA: Kita gunakan Gemini 1.5 Pro (Model paling tangguh)
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
+    const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
     
     const prompt = `
       Bertindaklah sebagai konsultan tata kota dan analis bisnis profesional. 
