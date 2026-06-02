@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import * as geocodeService from '../services/geocode.service.js';
-// 🔥 TAMBAHAN BARU: Import service peta dan otak heatmap kita
 import { getRegionsGeoJSON, getSuitabilityGrid } from '../services/region.service.js'; 
+// 🔥 TAMBAHAN BARU: Import otak AI kita
+import { generateLocationAnalysis } from '../services/ai.service.js';
 
 export const regionsRouter = Router();
 
@@ -55,6 +56,26 @@ regionsRouter.get('/grid/:id', async (req, res, next) => {
     // Melempar ID kelurahan dan nilai slider bobot (req.query) ke otak PostGIS
     const gridData = await getSuitabilityGrid(req.params.id as string, req.query);
     res.json(gridData); 
+  } catch (err) {
+    next(err);
+  }
+});
+
+// 🔥 TAMBAHAN BARU: Endpoint untuk memanggil AI Konsultan
+regionsRouter.post('/ai-analysis', async (req, res, next) => {
+  try {
+    const { locationName, score, competitorCount, marketPotential } = req.body;
+    
+    // Panggil otak AI Gemini
+    const analysisText = await generateLocationAnalysis(
+      locationName || 'Lokasi Terpilih', 
+      Number(score) || 0, 
+      Number(competitorCount) || 0, 
+      Number(marketPotential) || 0
+    );
+    
+    // Kembalikan teks murni ke Frontend
+    res.json({ analysis: analysisText });
   } catch (err) {
     next(err);
   }

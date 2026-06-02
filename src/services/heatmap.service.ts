@@ -12,40 +12,58 @@ export async function generateHeatmap(request: HeatmapGenerateRequest): Promise<
   // Determine cell size based on zoom level (in degrees, approximate)
   const cellSizeDeg = getCellSize(zoom);
 
-  // Generate grid cells using PostGIS ST_SquareGrid
+ // Generate grid cells using PostGIS ST_SquareGrid with LATERAL optimizations
   const gridResult = await db.execute(
     sql`
-      WITH grid AS (
+      WITH bbox_env AS (
+        -- 1. Kacamata Kuda: Kunci area pencarian HANYA seukuran layar (Bounding Box)
+        SELECT ST_MakeEnvelope(${bbox.west}, ${bbox.south}, ${bbox.east}, ${bbox.north}, 4326) AS geom
+      ),
+      grid AS (
+        -- 2. Buat grid hanya di dalam layar
         SELECT (ST_SquareGrid(
           ${cellSizeDeg},
-          ST_MakeEnvelope(${bbox.west}, ${bbox.south}, ${bbox.east}, ${bbox.north}, 4326)
+          (SELECT geom FROM bbox_env)
         )).*
       ),
-      cell_stats AS (
-        SELECT
-          g.geom AS cell_geom,
-          ST_Centroid(g.geom) AS center,
-          COALESCE(AVG(d.purchasing_power), 0) AS avg_purchasing,
-          COALESCE(AVG(d.population_density), 0) AS avg_density,
-          COALESCE(AVG(d.accessibility_score), 0) AS avg_accessibility,
-          COUNT(DISTINCT p.id) FILTER (WHERE p.type = 'competitor') AS competitor_count
-        FROM grid g
-        LEFT JOIN regions r ON ST_Intersects(r.boundary, g.geom) AND r.level = 'kelurahan'
+      local_regions AS (
+        -- 3. Tarik data demografi HANYA untuk kelurahan yang ada di layar (Pakai operator indeks spasial &&)
+        SELECT r.boundary, d.purchasing_power, d.population_density, d.accessibility_score
+        FROM regions r
         LEFT JOIN demographics d ON d.region_id = r.id ${dataYear ? sql`AND d.data_year = ${dataYear}` : sql``}
-        LEFT JOIN pois p ON ST_Within(p.location, g.geom) AND p.type = 'competitor'
-        GROUP BY g.geom
+        WHERE r.level = 'kelurahan' AND r.boundary && (SELECT geom FROM bbox_env)
+      ),
+      local_pois AS (
+        -- 4. Tarik data kompetitor HANYA yang ada di layar
+        SELECT location FROM pois 
+        WHERE type = 'competitor' AND location && (SELECT geom FROM bbox_env)
       )
       SELECT
-        ST_AsGeoJSON(cell_geom)::json AS cell_geojson,
-        ST_Y(center) AS lat,
-        ST_X(center) AS lng,
-        avg_purchasing,
-        avg_density,
-        avg_accessibility,
-        competitor_count
-      FROM cell_stats
+        ST_AsGeoJSON(g.geom)::json AS cell_geojson,
+        ST_Y(ST_Centroid(g.geom)) AS lat,
+        ST_X(ST_Centroid(g.geom)) AS lng,
+        COALESCE(r_stats.avg_purchasing, 0) AS avg_purchasing,
+        COALESCE(r_stats.avg_density, 0) AS avg_density,
+        COALESCE(r_stats.avg_accessibility, 0) AS avg_accessibility,
+        COALESCE(p_stats.competitor_count, 0) AS competitor_count
+      FROM grid g
+      -- 5. Gunakan LATERAL JOIN agar kalkulasi wilayah dan POI dipisah (mencegah Cartesian Explosion)
+      LEFT JOIN LATERAL (
+        SELECT
+          AVG(lr.purchasing_power) AS avg_purchasing,
+          AVG(lr.population_density) AS avg_density,
+          AVG(lr.accessibility_score) AS avg_accessibility
+        FROM local_regions lr
+        WHERE ST_Intersects(lr.boundary, g.geom)
+      ) r_stats ON true
+      LEFT JOIN LATERAL (
+        SELECT COUNT(*)::int AS competitor_count
+        FROM local_pois lp
+        WHERE ST_Intersects(lp.location, g.geom)
+      ) p_stats ON true
     `
   );
+  
 
   const cells: HeatmapCell[] = (gridResult.rows as Record<string, unknown>[]).map((row) => {
     // Compute weighted score per cell
