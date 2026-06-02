@@ -7,7 +7,6 @@ export async function generateLocationAnalysis(
   marketPotential: number
 ) {
   try {
-    // Ambil API Key dari Environment Variable
     const apiKey = process.env.GEMINI_API_KEY?.trim();
 
     if (!apiKey) {
@@ -16,13 +15,14 @@ export async function generateLocationAnalysis(
 
     console.log("Gemini Key Loaded:", apiKey.substring(0, 10) + "...");
 
-    // Inisialisasi Gemini
     const genAI = new GoogleGenerativeAI(apiKey);
 
-    // Gunakan model terbaru
+    // Gunakan model yang sudah terbukti berhasil
     const model = genAI.getGenerativeModel({
-      model: "gemini-2.0-flash",
+      model: "gemini-2.5-flash",
     });
+
+    console.log("Using Gemini Model: gemini-2.5-flash");
 
     const prompt = `
 Bertindaklah sebagai konsultan lokasi bisnis dan analis geospasial profesional.
@@ -41,6 +41,8 @@ Buat satu paragraf singkat (maksimal 4 kalimat) yang menjelaskan kelebihan, pelu
     const result = await model.generateContent(prompt);
 
     const response = result.response.text();
+
+    console.log("Gemini Response Success");
 
     return response;
   } catch (error) {
